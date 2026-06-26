@@ -217,9 +217,20 @@ class TestHexToDecimal:
     def test_uppercase(self):
         assert hex_to_decimal("FF") == 255
 
+    def test_with_leading_zeros(self):
+        assert hex_to_decimal("00ff") == 255
+
     def test_invalid_hex(self):
         with pytest.raises(ValueError):
             hex_to_decimal("gg")
+
+    def test_empty_string(self):
+        with pytest.raises(ValueError):
+            hex_to_decimal("")
+
+    def test_bare_prefix(self):
+        with pytest.raises(ValueError):
+            hex_to_decimal("0x")
 
     def test_invalid_type(self):
         with pytest.raises(TypeError):

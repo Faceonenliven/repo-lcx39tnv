@@ -30,6 +30,14 @@ class TestAdd:
     def test_floats(self):
         assert abs(add(0.1, 0.2) - 0.3) < 1e-9
 
+    def test_invalid_type_string(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            add("hello", "world")
+
+    def test_invalid_type_none(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            add(1, None)
+
 
 class TestSubtract:
     def test_positive_result(self):
@@ -40,6 +48,10 @@ class TestSubtract:
 
     def test_zeros(self):
         assert subtract(0, 0) == 0
+
+    def test_invalid_type(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            subtract("a", "b")
 
 
 class TestMultiply:
@@ -55,6 +67,10 @@ class TestMultiply:
     def test_mixed_signs(self):
         assert multiply(-2, 3) == -6
 
+    def test_invalid_type(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            multiply("abc", 3)
+
 
 class TestDivide:
     def test_even_division(self):
@@ -69,6 +85,10 @@ class TestDivide:
 
     def test_negative_division(self):
         assert divide(-6, 3) == -2
+
+    def test_invalid_type(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            divide("10", 2)
 
 
 class TestPower:
@@ -87,6 +107,10 @@ class TestPower:
     def test_negative_exponent(self):
         assert power(2, -1) == 0.5
 
+    def test_invalid_type(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            power("2", 3)
+
 
 class TestModulo:
     def test_basic(self):
@@ -101,6 +125,10 @@ class TestModulo:
 
     def test_negative(self):
         assert modulo(-7, 3) == 2  # Python modulo behavior
+
+    def test_invalid_type(self):
+        with pytest.raises(TypeError, match="must be numbers"):
+            modulo("10", 3)
 
 
 class TestFactorial:

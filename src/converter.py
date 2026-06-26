@@ -95,9 +95,12 @@ def hex_to_decimal(hex_str):
     """Convert a hexadecimal string to decimal integer."""
     if not isinstance(hex_str, str):
         raise TypeError("Input must be a string")
-    hex_str = hex_str.lstrip("0x").lstrip("0X")
     if not hex_str:
-        return 0
+        raise ValueError("Input must not be empty")
+    if hex_str.startswith(("0x", "0X")):
+        hex_str = hex_str[2:]
+    if not hex_str:
+        raise ValueError("Input must be a valid hexadecimal string")
     if not all(c in "0123456789abcdefABCDEF" for c in hex_str):
         raise ValueError("Input must be a valid hexadecimal string")
     return int(hex_str, 16)

@@ -3,21 +3,29 @@
 
 def add(a, b):
     """Add two numbers."""
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise TypeError("Both arguments must be numbers")
     return a + b
 
 
 def subtract(a, b):
     """Subtract b from a."""
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise TypeError("Both arguments must be numbers")
     return a - b
 
 
 def multiply(a, b):
     """Multiply two numbers."""
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise TypeError("Both arguments must be numbers")
     return a * b
 
 
 def divide(a, b):
     """Divide a by b. Raises ValueError if b is zero."""
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise TypeError("Both arguments must be numbers")
     if b == 0:
         raise ValueError("Cannot divide by zero")
     return a / b
@@ -25,11 +33,15 @@ def divide(a, b):
 
 def power(base, exponent):
     """Raise base to the power of exponent."""
+    if not isinstance(base, (int, float)) or not isinstance(exponent, (int, float)):
+        raise TypeError("Both arguments must be numbers")
     return base ** exponent
 
 
 def modulo(a, b):
     """Return the remainder of a divided by b."""
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise TypeError("Both arguments must be numbers")
     if b == 0:
         raise ValueError("Cannot compute modulo with zero divisor")
     return a % b
