@@ -30,11 +30,26 @@ with a persistent button panel:
    python main.py
    ```
 
-## Admin slash commands
+## Slash commands
 
-- `/panel` — post the button panel in the current channel
-- `/createkeys account_type:cs2_prime amount:5` — generate activation keys via the API
-- `/status` — show API status and reseller balance
+- `/panel` — post the Leaderboard / Redeem Key panel (admin only)
+- `/stock` — post the stock panel with a button per game category
 
 The redemption leaderboard is stored in `bot/data.json` (gitignored). Panel
 buttons use fixed `custom_id`s, so they keep working across bot restarts.
+
+## Deploy on Railway
+
+The repo root has a `Procfile`, `requirements.txt`, and `railway.json` so Railway
+runs the bot as a worker (`python -u bot/main.py`).
+
+1. On [railway.app](https://railway.app): **New Project → Deploy from GitHub repo**
+   and pick this repo.
+2. In the service **Variables** tab, add:
+   - `DISCORD_TOKEN`
+   - `NFA_API_KEY`
+3. Deploy. The bot runs 24/7 and restarts automatically on failure.
+
+Note: Railway's filesystem is ephemeral, so `bot/data.json` (the leaderboard)
+resets on each redeploy. Attach a Railway **Volume** mounted at `/app/bot` if you
+need the leaderboard to persist.
