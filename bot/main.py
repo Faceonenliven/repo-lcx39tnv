@@ -204,8 +204,7 @@ async def panel(interaction: discord.Interaction):
         ),
         color=EMBED_COLOR,
     )
-    await interaction.channel.send(embed=embed, view=ShopPanel())
-    await interaction.response.send_message("Panel posted.", ephemeral=True)
+    await interaction.response.send_message(embed=embed, view=ShopPanel())
 
 
 @bot.tree.command(name="stock", description="Post the stock panel with category buttons")
@@ -215,8 +214,7 @@ async def stock(interaction: discord.Interaction):
         description="Click a category below to see the stock for all its products.",
         color=EMBED_COLOR,
     )
-    await interaction.channel.send(embed=embed, view=StockPanel())
-    await interaction.response.send_message("Stock panel posted.", ephemeral=True)
+    await interaction.response.send_message(embed=embed, view=StockPanel())
 
 
 @bot.event
