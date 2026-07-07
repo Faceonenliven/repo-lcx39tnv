@@ -238,13 +238,34 @@ class ReplaceModal(discord.ui.Modal, title="Replace an Invalid Key"):
             )
 
 
-class CoinPanel(discord.ui.View):
+class ShopPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(
+        label="Leaderboard", style=discord.ButtonStyle.primary, emoji="🏆",
+        custom_id="shop_panel:leaderboard", row=0,
+    )
+    async def leaderboard(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await _send_leaderboard(interaction)
+
+    @discord.ui.button(
+        label="Redeem Key", style=discord.ButtonStyle.success, emoji="🔑",
+        custom_id="shop_panel:redeem", row=0,
+    )
+    async def redeem(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(RedeemModal())
+
+    @discord.ui.button(
+        label="Replace Key", style=discord.ButtonStyle.danger, emoji="♻️",
+        custom_id="coin_panel:replace", row=0,
+    )
+    async def replace(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(ReplaceModal())
+
+    @discord.ui.button(
         label="Balance", style=discord.ButtonStyle.primary, emoji="💰",
-        custom_id="coin_panel:balance",
+        custom_id="coin_panel:balance", row=1,
     )
     async def balance(self, interaction: discord.Interaction, button: discord.ui.Button):
         if await _coin_unavailable(interaction):
@@ -269,7 +290,7 @@ class CoinPanel(discord.ui.View):
 
     @discord.ui.button(
         label="Check Status", style=discord.ButtonStyle.secondary, emoji="✅",
-        custom_id="coin_panel:check",
+        custom_id="coin_panel:check", row=1,
     )
     async def check(self, interaction: discord.Interaction, button: discord.ui.Button):
         if await _coin_unavailable(interaction):
@@ -312,15 +333,8 @@ class CoinPanel(discord.ui.View):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @discord.ui.button(
-        label="Leaderboard", style=discord.ButtonStyle.secondary, emoji="🏆",
-        custom_id="coin_panel:leaderboard",
-    )
-    async def leaderboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await _send_leaderboard(interaction)
-
-    @discord.ui.button(
         label="Pay", style=discord.ButtonStyle.success, emoji="💸",
-        custom_id="coin_panel:pay",
+        custom_id="coin_panel:pay", row=1,
     )
     async def pay(self, interaction: discord.Interaction, button: discord.ui.Button):
         if await _coin_unavailable(interaction):
@@ -329,7 +343,7 @@ class CoinPanel(discord.ui.View):
 
     @discord.ui.button(
         label="How It Works", style=discord.ButtonStyle.secondary, emoji="❓",
-        custom_id="coin_panel:how",
+        custom_id="coin_panel:how", row=1,
     )
     async def howitworks(self, interaction: discord.Interaction, button: discord.ui.Button):
         if await _coin_unavailable(interaction):
@@ -355,32 +369,6 @@ class CoinPanel(discord.ui.View):
             ),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
-
-    @discord.ui.button(
-        label="Replace Key", style=discord.ButtonStyle.danger, emoji="♻️",
-        custom_id="coin_panel:replace",
-    )
-    async def replace(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(ReplaceModal())
-
-
-class ShopPanel(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(
-        label="Leaderboard", style=discord.ButtonStyle.primary, emoji="🏆",
-        custom_id="shop_panel:leaderboard",
-    )
-    async def leaderboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await _send_leaderboard(interaction)
-
-    @discord.ui.button(
-        label="Redeem Key", style=discord.ButtonStyle.success, emoji="🔑",
-        custom_id="shop_panel:redeem",
-    )
-    async def redeem(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(RedeemModal())
 
 
 async def _send_category_stock(interaction: discord.Interaction, game_key: str):
@@ -439,7 +427,6 @@ class ShopBot(discord.Client):
     async def setup_hook(self):
         self.add_view(ShopPanel())
         self.add_view(StockPanel())
-        self.add_view(CoinPanel())
         self.tree.add_command(CoinAdminGroup())
         await self.tree.sync()
 
@@ -453,31 +440,18 @@ async def panel(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Shop Panel",
         description=(
-            "**🏆 Leaderboard**\nSee the top key redeemers.\n\n"
-            "**🔑 Redeem Key**\nRedeem an activation key to claim your account and loader.\n\n"
+            "**🏆 Leaderboard** — top coin holders\n"
+            "**🔑 Redeem Key** — redeem an activation key for your account and loader\n"
+            "**♻️ Replace Key** — replace an invalid key (3-hour warranty)\n"
+            "**💰 Balance** — your coins and progress to the next one\n"
+            "**✅ Check Status** — see if you're currently earning\n"
+            "**💸 Pay** — send coins to another member\n"
+            "**❓ How It Works** — how to earn coins\n\n"
             "Use `/stock` for live stock by category."
         ),
         color=EMBED_COLOR,
     )
     await interaction.response.send_message(embed=embed, view=ShopPanel())
-
-
-@bot.tree.command(name="coins", description="Post the coin panel with buttons (admin only)")
-@app_commands.default_permissions(administrator=True)
-async def coins(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🪙 Coin Panel",
-        description=(
-            "**💰 Balance** — your coins and progress to the next one\n"
-            "**✅ Check Status** — see if you're currently earning\n"
-            "**🏆 Leaderboard** — top coin holders\n"
-            "**💸 Pay** — send coins to another member\n"
-            "**❓ How It Works** — how to earn coins\n"
-            "**♻️ Replace Key** — replace an invalid key (3-hour warranty)"
-        ),
-        color=EMBED_COLOR,
-    )
-    await interaction.response.send_message(embed=embed, view=CoinPanel())
 
 
 @app_commands.guild_only()
