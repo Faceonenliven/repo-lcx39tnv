@@ -1,9 +1,12 @@
 # Discord Shop Bot
 
-A Discord bot with a button panel for:
-- **🏆 Leaderboard** — top key redeemers
-- **🔑 Redeem Key** — redeem a license key via a popup form
-- **📦 Check Stock** — see how many keys are in stock per product
+A Discord bot, backed by the [NFA Resell API](https://nfa-api.acode.ing/docs),
+with a persistent button panel:
+
+- **🏆 Leaderboard** — top key redeemers (tracked locally, ephemeral to the user)
+- **🔑 Redeem Key** — opens a form to enter an activation key; on success the bot
+  activates it via the API and DMs the account details + loader `.exe`
+- **📦 Check Stock** — live stock counts and prices per account type from the API
 
 ## Setup
 
@@ -11,25 +14,27 @@ A Discord bot with a button panel for:
    ```
    pip install -r requirements.txt
    ```
-2. Copy `.env.example` to `.env` and put your bot token in it:
+2. Copy `.env.example` to `.env` and fill in:
    ```
-   DISCORD_TOKEN=...
+   DISCORD_TOKEN=...      # Discord bot token
+   NFA_API_KEY=...        # NFA reseller API key (Panel → API → Create API key)
    ```
-3. Invite the bot to your server with the `bot` and `applications.commands` scopes:
+3. In the Discord developer portal, make sure the app's **Interactions Endpoint URL**
+   is empty (otherwise buttons/commands won't reach the bot over the gateway).
+4. Invite the bot with the `bot` and `applications.commands` scopes:
    ```
    https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=2048
    ```
-4. Run the bot:
+5. Run the bot:
    ```
    python main.py
    ```
 
-## Usage (admin slash commands)
+## Admin slash commands
 
-- `/addproduct name:Fortnite` — add a product
-- `/addkeys product:Fortnite keys:KEY-1 KEY-2 KEY-3` — add keys to stock
-- `/removeproduct name:Fortnite` — remove a product
 - `/panel` — post the button panel in the current channel
+- `/createkeys account_type:cs2_prime amount:5` — generate activation keys via the API
+- `/status` — show API status and reseller balance
 
-Data is stored in `bot/data.json` (created automatically). The panel buttons
-are persistent and keep working after the bot restarts.
+The redemption leaderboard is stored in `bot/data.json` (gitignored). Panel
+buttons use fixed `custom_id`s, so they keep working across bot restarts.
