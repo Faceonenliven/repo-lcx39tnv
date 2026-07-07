@@ -73,6 +73,22 @@ async def key_details(activation_key: str) -> dict:
     return await _request("GET", "/key_details", params={"activation_key": activation_key})
 
 
+async def check_account(activation_key: str) -> dict:
+    """Warranty check/replace for a key. Returns the raw response (result, replacement_key...)."""
+    headers = {"X-API-Key": _api_key()}
+    url = f"{BASE_URL}/check_account"
+    timeout = aiohttp.ClientTimeout(total=60)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json={"activation_key": activation_key}, headers=headers) as resp:
+                data = await resp.json(content_type=None)
+    except (aiohttp.ClientError, ValueError) as e:
+        raise APIError(f"Could not reach the replacement service: {e}")
+    if not isinstance(data, dict):
+        raise APIError("Unexpected response shape from API")
+    return data
+
+
 def _coin_base() -> str:
     base = os.environ["COIN_API_BASE"].strip().rstrip("/")
     if not base.startswith(("http://", "https://")):
@@ -80,18 +96,55 @@ def _coin_base() -> str:
     return base
 
 
-async def coin_leaderboard(limit: int = 10) -> list[tuple[int, int]]:
-    """Fetch the top coin holders from status-coin-bot. Returns [(user_id, coins)]."""
-    url = f"{_coin_base()}/api/coins/leaderboard"
+async def _coin_request(method: str, path: str, *, params=None, json=None) -> dict:
+    url = f"{_coin_base()}{path}"
     headers = {"X-API-Key": os.environ["COIN_API_KEY"]}
     timeout = aiohttp.ClientTimeout(total=30)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, params={"limit": limit}, headers=headers) as resp:
+            async with session.request(method, url, params=params, json=json, headers=headers) as resp:
+                data = await resp.json(content_type=None)
                 if resp.status != 200:
-                    raise APIError(f"Coin API returned HTTP {resp.status}")
-                data = await resp.json()
+                    msg = data.get("error") if isinstance(data, dict) else None
+                    raise APIError(msg or f"Coin API returned HTTP {resp.status}")
     except (aiohttp.ClientError, ValueError) as e:
         raise APIError(f"Could not reach coin API: {e}")
-    entries = data.get("leaderboard", []) if isinstance(data, dict) else []
-    return [(int(e["user_id"]), int(e["coins"])) for e in entries]
+    if not isinstance(data, dict):
+        raise APIError("Unexpected response shape from coin API")
+    return data
+
+
+async def coin_leaderboard(limit: int = 10) -> list[tuple[int, int]]:
+    """Fetch the top coin holders from status-coin-bot. Returns [(user_id, coins)]."""
+    data = await _coin_request("GET", "/api/coins/leaderboard", params={"limit": limit})
+    return [(int(e["user_id"]), int(e["coins"])) for e in data.get("leaderboard", [])]
+
+
+async def coin_profile(user_id: int) -> dict:
+    return await _coin_request("GET", "/api/coins/profile", params={"user_id": user_id})
+
+
+async def coin_check(user_id: int) -> dict:
+    return await _coin_request("GET", "/api/coins/check", params={"user_id": user_id})
+
+
+async def coin_settings() -> dict:
+    return await _coin_request("GET", "/api/coins/settings")
+
+
+async def coin_update_setting(key: str, value) -> dict:
+    return await _coin_request("POST", "/api/coins/settings", json={"key": key, "value": value})
+
+
+async def coin_pay(from_id: int, to_id: int, amount: int) -> dict:
+    return await _coin_request(
+        "POST", "/api/coins/pay", json={"from_id": from_id, "to_id": to_id, "amount": amount}
+    )
+
+
+async def coin_adjust(user_id: int, delta: int) -> dict:
+    return await _coin_request("POST", "/api/coins/adjust", json={"user_id": user_id, "delta": delta})
+
+
+async def coin_set(user_id: int, amount: int) -> dict:
+    return await _coin_request("POST", "/api/coins/set", json={"user_id": user_id, "amount": amount})
