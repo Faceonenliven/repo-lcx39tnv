@@ -73,16 +73,25 @@ async def key_details(activation_key: str) -> dict:
     return await _request("GET", "/key_details", params={"activation_key": activation_key})
 
 
+def _coin_base() -> str:
+    base = os.environ["COIN_API_BASE"].strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        base = "https://" + base
+    return base
+
+
 async def coin_leaderboard(limit: int = 10) -> list[tuple[int, int]]:
     """Fetch the top coin holders from status-coin-bot. Returns [(user_id, coins)]."""
-    base = os.environ["COIN_API_BASE"].rstrip("/")
-    url = f"{base}/api/coins/leaderboard"
+    url = f"{_coin_base()}/api/coins/leaderboard"
     headers = {"X-API-Key": os.environ["COIN_API_KEY"]}
     timeout = aiohttp.ClientTimeout(total=30)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(url, params={"limit": limit}, headers=headers) as resp:
-            if resp.status != 200:
-                raise APIError(f"Coin API returned HTTP {resp.status}")
-            data = await resp.json()
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, params={"limit": limit}, headers=headers) as resp:
+                if resp.status != 200:
+                    raise APIError(f"Coin API returned HTTP {resp.status}")
+                data = await resp.json()
+    except (aiohttp.ClientError, ValueError) as e:
+        raise APIError(f"Could not reach coin API: {e}")
     entries = data.get("leaderboard", []) if isinstance(data, dict) else []
     return [(int(e["user_id"]), int(e["coins"])) for e in entries]
