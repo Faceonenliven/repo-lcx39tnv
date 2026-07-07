@@ -110,18 +110,33 @@ class ShopPanel(discord.ui.View):
         custom_id="shop_panel:leaderboard",
     )
     async def leaderboard(self, interaction: discord.Interaction, button: discord.ui.Button):
-        entries = storage.get_leaderboard()
-        if not entries:
-            desc = "No redemptions yet."
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        medals = ["🥇", "🥈", "🥉"]
+
+        if api.coin_api_configured():
+            try:
+                entries = await api.coin_leaderboard()
+            except api.APIError as e:
+                await interaction.followup.send(f"Could not fetch leaderboard: {e}", ephemeral=True)
+                return
+            title = "🏆 Coin Leaderboard"
+            unit = "coin"
         else:
-            medals = ["🥇", "🥈", "🥉"]
+            entries = storage.get_leaderboard()
+            title = "🏆 Redemption Leaderboard"
+            unit = "redemption"
+
+        if not entries:
+            desc = "No entries yet."
+        else:
             lines = []
-            for i, (uid, count) in enumerate(entries):
+            for i, (uid, amount) in enumerate(entries):
                 rank = medals[i] if i < 3 else f"`#{i + 1}`"
-                lines.append(f"{rank} <@{uid}> — **{count}** redemption{'s' if count != 1 else ''}")
+                lines.append(f"{rank} <@{uid}> — **{amount}** {unit}{'s' if amount != 1 else ''}")
             desc = "\n".join(lines)
-        embed = discord.Embed(title="🏆 Redemption Leaderboard", description=desc, color=EMBED_COLOR)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        embed = discord.Embed(title=title, description=desc, color=EMBED_COLOR)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @discord.ui.button(
         label="Redeem Key", style=discord.ButtonStyle.success, emoji="🔑",
@@ -146,9 +161,10 @@ async def _send_category_stock(interaction: discord.Interaction, game_key: str):
         if account_type.split("_")[0] != game_key:
             continue
         emoji = "🟢" if count > 0 else "🔴"
+        display = "5+" if count > 5 else str(count)
         price = prices.get(account_type)
         price_str = f" — ${price:.2f}" if price is not None else ""
-        lines.append(f"{emoji} {_pretty_type(account_type)} — **{count}** in stock{price_str}")
+        lines.append(f"{emoji} {_pretty_type(account_type)} — **{display}** in stock{price_str}")
 
     embed = discord.Embed(
         title=f"📦 {game_name} Stock",
