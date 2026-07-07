@@ -130,41 +130,52 @@ class ShopPanel(discord.ui.View):
     async def redeem(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(RedeemModal())
 
-    @discord.ui.button(
-        label="Check Stock", style=discord.ButtonStyle.secondary, emoji="📦",
-        custom_id="shop_panel:stock",
+
+async def _send_category_stock(interaction: discord.Interaction, game_key: str):
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        stock = await api.get_stock()
+        prices = await api.get_accounts()
+    except api.APIError as e:
+        await interaction.followup.send(f"Could not fetch stock: {e}", ephemeral=True)
+        return
+
+    game_name = GAME_NAMES.get(game_key, game_key.title())
+    lines = []
+    for account_type, count in stock.items():
+        if account_type.split("_")[0] != game_key:
+            continue
+        emoji = "🟢" if count > 0 else "🔴"
+        price = prices.get(account_type)
+        price_str = f" — ${price:.2f}" if price is not None else ""
+        lines.append(f"{emoji} {_pretty_type(account_type)} — **{count}** in stock{price_str}")
+
+    embed = discord.Embed(
+        title=f"📦 {game_name} Stock",
+        description="\n".join(lines) if lines else "No products in this category.",
+        color=EMBED_COLOR,
     )
-    async def stock(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            stock = await api.get_stock()
-            prices = await api.get_accounts()
-        except api.APIError as e:
-            await interaction.followup.send(f"Could not fetch stock: {e}", ephemeral=True)
-            return
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
-        embed = discord.Embed(title="📦 Current Stock", color=EMBED_COLOR)
-        groups: dict[str, list[str]] = {}
-        for account_type, count in stock.items():
-            game = account_type.split("_")[0]
-            emoji = "🟢" if count > 0 else "🔴"
-            price = prices.get(account_type)
-            price_str = f" — ${price:.2f}" if price is not None else ""
-            line = f"{emoji} {_pretty_type(account_type)} — **{count}**{price_str}"
-            groups.setdefault(game, []).append(line)
 
-        for game, lines in groups.items():
-            # Embed field values are capped at 1024 chars.
-            chunk = ""
-            for line in lines:
-                if len(chunk) + len(line) + 1 > 1024:
-                    embed.add_field(name=GAME_NAMES.get(game, game.title()), value=chunk, inline=False)
-                    chunk = ""
-                chunk += line + "\n"
-            if chunk:
-                embed.add_field(name=GAME_NAMES.get(game, game.title()), value=chunk, inline=False)
+class CategoryButton(discord.ui.Button):
+    def __init__(self, game_key: str, label: str):
+        super().__init__(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"stock_cat:{game_key}",
+        )
+        self.game_key = game_key
 
-        await interaction.followup.send(embed=embed, ephemeral=True)
+    async def callback(self, interaction: discord.Interaction):
+        await _send_category_stock(interaction, self.game_key)
+
+
+class StockPanel(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        for game_key, label in GAME_NAMES.items():
+            self.add_item(CategoryButton(game_key, label))
 
 
 class ShopBot(discord.Client):
@@ -174,6 +185,7 @@ class ShopBot(discord.Client):
 
     async def setup_hook(self):
         self.add_view(ShopPanel())
+        self.add_view(StockPanel())
         await self.tree.sync()
 
 
@@ -188,7 +200,7 @@ async def panel(interaction: discord.Interaction):
         description=(
             "**🏆 Leaderboard**\nSee the top key redeemers.\n\n"
             "**🔑 Redeem Key**\nRedeem an activation key to claim your account and loader.\n\n"
-            "**📦 Check Stock**\nView live stock and prices for every account type."
+            "Use `/stock` for live stock by category."
         ),
         color=EMBED_COLOR,
     )
@@ -196,40 +208,15 @@ async def panel(interaction: discord.Interaction):
     await interaction.response.send_message("Panel posted.", ephemeral=True)
 
 
-@bot.tree.command(name="createkeys", description="Generate new activation keys (admin only)")
-@app_commands.default_permissions(administrator=True)
-@app_commands.describe(account_type="e.g. cs2_prime", amount="How many keys to create")
-async def createkeys(interaction: discord.Interaction, account_type: str, amount: int):
-    await interaction.response.defer(ephemeral=True, thinking=True)
-    try:
-        keys = await api.create_keys(account_type, amount)
-    except api.APIError as e:
-        await interaction.followup.send(f"Failed to create keys: {e}", ephemeral=True)
-        return
-    body = "\n".join(keys) if keys else "(no keys returned)"
+@bot.tree.command(name="stock", description="Post the stock panel with category buttons")
+async def stock(interaction: discord.Interaction):
     embed = discord.Embed(
-        title=f"Created {len(keys)} key(s) for {account_type}",
-        description=f"```\n{body[:3900]}\n```",
-        color=discord.Color.green(),
+        title="📦 Stock",
+        description="Click a category below to see the stock for all its products.",
+        color=EMBED_COLOR,
     )
-    await interaction.followup.send(embed=embed, ephemeral=True)
-
-
-@bot.tree.command(name="status", description="Check API status (admin only)")
-@app_commands.default_permissions(administrator=True)
-async def status(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True, thinking=True)
-    try:
-        s = await api.get_status()
-    except api.APIError as e:
-        await interaction.followup.send(f"Failed to fetch status: {e}", ephemeral=True)
-        return
-    embed = discord.Embed(title="API Status", color=EMBED_COLOR)
-    embed.add_field(name="API active", value="✅" if s.get("api_active") else "❌")
-    embed.add_field(name="Balance", value=f"${s.get('balance', 0):.2f}")
-    embed.add_field(name="Steam down", value="⚠️ yes" if s.get("steam_down") else "no")
-    embed.add_field(name="Maintenance", value="⚠️ yes" if s.get("technical_works") else "no")
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    await interaction.channel.send(embed=embed, view=StockPanel())
+    await interaction.response.send_message("Stock panel posted.", ephemeral=True)
 
 
 @bot.event
