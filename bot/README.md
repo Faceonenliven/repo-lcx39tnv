@@ -3,7 +3,8 @@
 A Discord bot, backed by the [NFA Resell API](https://nfa-api.acode.ing/docs),
 with a persistent button panel:
 
-- **🏆 Leaderboard** — top key redeemers (tracked locally, ephemeral to the user)
+- **🏆 Leaderboard** — top coin holders from [status-coin-bot](https://github.com/dogyrust/status-coin-bot)
+  when `COIN_API_BASE`/`COIN_API_KEY` are set (falls back to local redemption counts)
 - **🔑 Redeem Key** — opens a form to enter an activation key; on success the bot
   activates it via the API and DMs the account details + loader `.exe`
 - **📦 Check Stock** — live stock counts and prices per account type from the API
