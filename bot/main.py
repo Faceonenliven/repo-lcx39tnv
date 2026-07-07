@@ -238,6 +238,102 @@ class ReplaceModal(discord.ui.Modal, title="Replace an Invalid Key"):
             )
 
 
+_buying: set[int] = set()
+
+
+class BuySelect(discord.ui.Select):
+    def __init__(self, tiers: list[dict], stock: dict, coin_name: str):
+        self.tiers = {t["account_type"]: t for t in tiers}
+        self.coin_name = coin_name
+        options = []
+        for t in tiers[:25]:
+            count = stock.get(t["account_type"])
+            in_stock = count is None or count > 0
+            options.append(
+                discord.SelectOption(
+                    label=t["label"][:100],
+                    value=t["account_type"],
+                    description=f"{t['cost']} {coin_name}(s) · {'in stock' if in_stock else 'OUT OF STOCK'}"[:100],
+                    emoji="🟢" if in_stock else "🔴",
+                )
+            )
+        super().__init__(placeholder="Pick an account to buy…", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        tier = self.tiers.get(self.values[0])
+        if tier is None:
+            await interaction.response.send_message("Unknown product.", ephemeral=True)
+            return
+        if interaction.user.id in _buying:
+            await interaction.response.send_message(
+                "You already have a purchase in progress — please wait.", ephemeral=True
+            )
+            return
+        _buying.add(interaction.user.id)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        cost = int(tier["cost"])
+        try:
+            try:
+                await api.coin_adjust(interaction.user.id, -cost)
+            except api.APIError as e:
+                await interaction.followup.send(
+                    f"Purchase failed: {e}. You need **{cost}** {self.coin_name}(s).",
+                    ephemeral=True,
+                )
+                return
+            try:
+                keys = await api.create_keys(tier["account_type"], 1)
+                if not keys:
+                    raise api.APIError("No key was returned")
+            except api.APIError as e:
+                try:
+                    await api.coin_adjust(interaction.user.id, cost)
+                    refund_note = "You were **refunded**."
+                except api.APIError:
+                    refund_note = "Refund failed — contact an admin."
+                await interaction.followup.send(
+                    f"Purchase failed: {e}\n{refund_note}", ephemeral=True
+                )
+                return
+            key = keys[0]
+            content = (
+                f"🎉 **{tier['label']}** — here's your key!\n\n"
+                f"**Your key:** ||`{key}`||\n\n"
+                f"Redeem it with the 🔑 **Redeem Key** button on the panel. "
+                f"Keep it private — treat it like cash."
+            )
+            try:
+                dm = await interaction.user.create_dm()
+                await dm.send(content)
+                await interaction.followup.send(
+                    "✅ Purchase complete — check your **DMs** for your key!", ephemeral=True
+                )
+            except discord.HTTPException:
+                await interaction.followup.send(
+                    "✅ Purchase complete! I couldn't DM you, so here it is privately:\n\n" + content,
+                    ephemeral=True,
+                )
+            if interaction.channel is not None:
+                announce = discord.Embed(
+                    title="🪙 New purchase!",
+                    description=f"{interaction.user.mention} just bought **{tier['label']}** "
+                    f"for **{cost}** {self.coin_name}(s)!",
+                    color=EMBED_COLOR,
+                )
+                try:
+                    await interaction.channel.send(embed=announce)
+                except discord.HTTPException:
+                    pass
+        finally:
+            _buying.discard(interaction.user.id)
+
+
+class BuyView(discord.ui.View):
+    def __init__(self, tiers: list[dict], stock: dict, coin_name: str):
+        super().__init__(timeout=300)
+        self.add_item(BuySelect(tiers, stock, coin_name))
+
+
 class ShopPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -262,6 +358,41 @@ class ShopPanel(discord.ui.View):
     )
     async def replace(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(ReplaceModal())
+
+    @discord.ui.button(
+        label="Buy Key", style=discord.ButtonStyle.success, emoji="🛒",
+        custom_id="shop_panel:buy", row=0,
+    )
+    async def buy(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await _coin_unavailable(interaction):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            store = await api.coin_store()
+            profile = await api.coin_profile(interaction.user.id)
+        except api.APIError as e:
+            await interaction.followup.send(f"Could not load the store: {e}", ephemeral=True)
+            return
+        try:
+            stock = await api.get_stock()
+        except api.APIError:
+            stock = {}
+        tiers = store.get("tiers", [])
+        if not tiers:
+            await interaction.followup.send("The store has no products configured.", ephemeral=True)
+            return
+        coin_name = store.get("coin_name", "coin")
+        embed = discord.Embed(
+            title="🛒 Buy a Key with Coins",
+            description=(
+                f"You have **{profile.get('coins', 0)}** {coin_name}(s).\n"
+                "Pick a product below — the key is delivered to your DMs."
+            ),
+            color=EMBED_COLOR,
+        )
+        await interaction.followup.send(
+            embed=embed, view=BuyView(tiers, stock, coin_name), ephemeral=True
+        )
 
     @discord.ui.button(
         label="Balance", style=discord.ButtonStyle.primary, emoji="💰",
@@ -443,6 +574,7 @@ async def panel(interaction: discord.Interaction):
             "**🏆 Leaderboard** — top coin holders\n"
             "**🔑 Redeem Key** — redeem an activation key for your account and loader\n"
             "**♻️ Replace Key** — replace an invalid key (3-hour warranty)\n"
+            "**🛒 Buy Key** — spend coins on a new account key\n"
             "**💰 Balance** — your coins and progress to the next one\n"
             "**✅ Check Status** — see if you're currently earning\n"
             "**💸 Pay** — send coins to another member\n"
