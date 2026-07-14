@@ -313,17 +313,6 @@ class BuySelect(discord.ui.Select):
                     "✅ Purchase complete! I couldn't DM you, so here it is privately:\n\n" + content,
                     ephemeral=True,
                 )
-            if interaction.channel is not None:
-                announce = discord.Embed(
-                    title="🪙 New purchase!",
-                    description=f"{interaction.user.mention} just bought **{tier['label']}** "
-                    f"for **{cost}** {self.coin_name}(s)!",
-                    color=EMBED_COLOR,
-                )
-                try:
-                    await interaction.channel.send(embed=announce)
-                except discord.HTTPException:
-                    pass
         finally:
             _buying.discard(interaction.user.id)
 
