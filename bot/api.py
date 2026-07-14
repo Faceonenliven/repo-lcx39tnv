@@ -132,6 +132,10 @@ async def coin_settings() -> dict:
     return await _coin_request("GET", "/api/coins/settings")
 
 
+async def coin_store() -> dict:
+    return await _coin_request("GET", "/api/coins/store")
+
+
 async def coin_update_setting(key: str, value) -> dict:
     return await _coin_request("POST", "/api/coins/settings", json={"key": key, "value": value})
 
